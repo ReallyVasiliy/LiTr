@@ -20,7 +20,6 @@ import com.linkedin.android.litr.demo.audio.AudioTrackReader
 import com.linkedin.android.litr.demo.camera.CameraHandler
 import com.linkedin.android.litr.demo.camera.MultiTargetCameraThread
 import com.linkedin.android.litr.demo.camera.CameraThreadListener
-import com.linkedin.android.litr.demo.data.AudioTrackFormat
 import com.linkedin.android.litr.demo.data.TargetMedia
 import com.linkedin.android.litr.demo.databinding.FragmentRecordCameraBinding
 import com.linkedin.android.litr.io.*
@@ -271,10 +270,6 @@ class RecordCameraFragment : BaseTransformationFragment() {
                 "bitrate=$bitrate"
             )
             return bitrate
-        }
-
-        fun calculateAudioBitrate(samplingFrequency: Int, channels: Int, sampleSizePerChannel: Int = 2): Int {
-            return samplingFrequency * sampleSizePerChannel * channels * 8
         }
     }
 }

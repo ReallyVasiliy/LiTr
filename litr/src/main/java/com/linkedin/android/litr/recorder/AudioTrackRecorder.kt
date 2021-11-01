@@ -68,9 +68,10 @@ class AudioTrackRecorder internal constructor(
     }
 
     override fun stop() {
+        reader.stop()
+        drainEncoder()
         encoder.stop()
         encoder.release()
-        reader.stop()
     }
 
 
