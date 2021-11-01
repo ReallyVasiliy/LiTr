@@ -8,10 +8,9 @@ import com.linkedin.android.litr.render.Renderer
 
 data class MediaRecordParameters(
     val reader: MediaTrackReader,
-    val sourceFormat: MediaFormat,
     val targetTrack: Int,
     val targetFormat: MediaFormat,
     val mediaTarget: MediaTarget,
     val encoder: Encoder,
-    val renderer: Renderer
+    val renderer: Renderer? = null
 )

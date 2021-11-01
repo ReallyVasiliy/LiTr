@@ -22,7 +22,6 @@ import com.linkedin.android.litr.utils.TranscoderUtils
 @RestrictTo(RestrictTo.Scope.LIBRARY)
 class SurfaceMediaRecorder internal constructor(
     val reader: SurfaceTrackReader,
-    val sourceFormat: MediaFormat,
     val mediaTarget: MediaTarget,
     private var targetTrack: Int,
     private var targetFormat: MediaFormat,
@@ -41,13 +40,8 @@ class SurfaceMediaRecorder internal constructor(
 
     @Throws(TrackTranscoderException::class)
     private fun initCodecs() {
-        if (sourceFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
-            val sourceFrameRate = sourceFormat.getInteger(MediaFormat.KEY_FRAME_RATE)
-            targetFormat.setInteger(MediaFormat.KEY_FRAME_RATE, sourceFrameRate)
-        }
-
         encoder.init(targetFormat)
-        renderer.init(encoder.createInputSurface(), sourceFormat, targetFormat)
+        renderer.init(encoder.createInputSurface(), null, targetFormat)
 
         val size = TranscoderUtils.getDimensions(targetFormat) ?: Point(1, 1)
         renderer.prepareInputSurface(size.x, size.y)
@@ -113,7 +107,7 @@ class SurfaceMediaRecorder internal constructor(
                         targetFormat = outputMediaFormat
                         targetTrack = mediaTarget.addTrack(outputMediaFormat, targetTrack)
                         targetTrackAdded = true
-                        renderer.onMediaFormatChanged(sourceFormat, targetFormat)
+                        renderer.onMediaFormatChanged(null, targetFormat)
                     }
                     encodeFrameResult = RESULT_OUTPUT_MEDIA_FORMAT_CHANGED
                     Log.d(TAG, "Encoder output format received $outputMediaFormat")

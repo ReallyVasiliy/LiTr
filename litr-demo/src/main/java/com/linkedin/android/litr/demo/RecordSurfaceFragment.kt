@@ -96,8 +96,6 @@ class RecordSurfaceFragment : BaseTransformationFragment() {
 
         val videoTrackParams = MediaRecordParameters(
             reader = surfaceTrackReader,
-            // TODO: Obtain source format from screen parameters?
-            sourceFormat = format,
             targetTrack = 0,
             targetFormat = format,
             mediaTarget = mediaTarget,

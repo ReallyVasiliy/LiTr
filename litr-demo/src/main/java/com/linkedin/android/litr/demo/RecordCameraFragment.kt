@@ -15,16 +15,21 @@ import android.view.*
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.linkedin.android.litr.codec.MediaCodecEncoder
+import com.linkedin.android.litr.demo.audio.AudioRecordConfig
+import com.linkedin.android.litr.demo.audio.AudioTrackReader
 import com.linkedin.android.litr.demo.camera.CameraHandler
 import com.linkedin.android.litr.demo.camera.MultiTargetCameraThread
 import com.linkedin.android.litr.demo.camera.CameraThreadListener
+import com.linkedin.android.litr.demo.data.AudioTrackFormat
 import com.linkedin.android.litr.demo.data.TargetMedia
 import com.linkedin.android.litr.demo.databinding.FragmentRecordCameraBinding
 import com.linkedin.android.litr.io.*
 import com.linkedin.android.litr.recorder.MediaRecordParameters
 import com.linkedin.android.litr.recorder.MediaRecordRequestManager
+import com.linkedin.android.litr.recorder.readers.ByteBufferTrackReader
 import com.linkedin.android.litr.recorder.readers.SurfaceTrackReader
 import com.linkedin.android.litr.render.GlVideoRenderer
+import com.linkedin.android.litr.render.PassthroughSoftwareRenderer
 import com.linkedin.android.litr.render.VideoRenderInputSurface
 import com.linkedin.android.litr.utils.TransformationUtil
 import java.io.File
@@ -32,6 +37,10 @@ import java.util.*
 
 @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 class RecordCameraFragment : BaseTransformationFragment() {
+
+    private lateinit var surfaceTrackReader: SurfaceTrackReader
+    private lateinit var audioTrackReader: ByteBufferTrackReader
+    private lateinit var audioConfig: AudioRecordConfig
 
     private var cameraPreviewSize: Point? = null
     private var cameraRecordSurfaceTexture: VideoRenderInputSurface? = null
@@ -48,6 +57,20 @@ class RecordCameraFragment : BaseTransformationFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mediaRecorder = MediaRecordRequestManager(context!!.applicationContext)
+
+        audioConfig = AudioRecordConfig.createDefault(1)
+
+        audioTrackReader = AudioTrackReader(audioConfig)
+
+        surfaceTrackReader = object : SurfaceTrackReader {
+            override fun drawFrame(surface: Surface, presentationTimeNs: Long) {
+                // Do nothing: camera is the frame producer
+            }
+
+            override fun start() {}
+
+            override fun stop() {}
+        }
     }
 
     override fun onDestroyView() {
@@ -129,25 +152,20 @@ class RecordCameraFragment : BaseTransformationFragment() {
 
         val mediaTarget: MediaTarget = MediaMuxerMediaTarget(
             targetMedia.targetFile.path,
-            1,
+            2,
             0,
             MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4
         )
 
-        val sourceFormat = MediaFormat.createVideoFormat("video/avc", previewSurfaceSize.x, previewSurfaceSize.y).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-        }
-
         val targetFormat = MediaFormat.createVideoFormat("video/avc", videoDimensions.x, videoDimensions.y).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, calcBitRate(videoDimensions.x, videoDimensions.y))
+            setInteger(MediaFormat.KEY_BIT_RATE, calculateVideoBitrate(videoDimensions.x, videoDimensions.y))
             setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 3)
         }
 
         val videoTrackParams = MediaRecordParameters(
             reader = surfaceTrackReader,
-            sourceFormat = sourceFormat,
             targetTrack = 0,
             targetFormat = targetFormat,
             mediaTarget = mediaTarget,
@@ -156,10 +174,20 @@ class RecordCameraFragment : BaseTransformationFragment() {
             renderer = GlVideoRenderer.Builder().setInputSurface(cameraRecordSurfaceTexture).build()
         )
 
+        val audioEncoder = MediaCodecEncoder()
+        val audioTrackParams = MediaRecordParameters(
+            reader = audioTrackReader,
+            targetTrack = 1,
+            targetFormat = audioConfig.mediaFormat,
+            mediaTarget = mediaTarget,
+            encoder = audioEncoder,
+            renderer = PassthroughSoftwareRenderer(audioEncoder)
+        )
+
         requestId = UUID.randomUUID().toString()
         mediaRecorder.record(
             requestId,
-            listOf(videoTrackParams)
+            listOf(videoTrackParams, audioTrackParams)
         )
     }
 
@@ -213,16 +241,6 @@ class RecordCameraFragment : BaseTransformationFragment() {
 
     // region: Event listeners
 
-    private val surfaceTrackReader = object : SurfaceTrackReader {
-        override fun drawFrame(surface: Surface, presentationTimeNs: Long) {
-            // Do nothing: camera is the frame producer
-        }
-
-        override fun start() {}
-
-        override fun stop() {}
-    }
-
     // TODO: Handle camera events -- e.g. stop transcoding here
     private val cameraListener = object : CameraThreadListener {
         override fun onCameraStarted(previewWidth: Int, previewHeight: Int) {
@@ -245,7 +263,7 @@ class RecordCameraFragment : BaseTransformationFragment() {
         private const val FRAME_RATE = 30
         private const val BPP = 0.25f
 
-        fun calcBitRate(width: Int, height: Int): Int {
+        fun calculateVideoBitrate(width: Int, height: Int): Int {
             val bitrate =
                 (BPP * FRAME_RATE * width * height).toInt()
             Log.i(
@@ -253,6 +271,10 @@ class RecordCameraFragment : BaseTransformationFragment() {
                 "bitrate=$bitrate"
             )
             return bitrate
+        }
+
+        fun calculateAudioBitrate(samplingFrequency: Int, channels: Int, sampleSizePerChannel: Int = 2): Int {
+            return samplingFrequency * sampleSizePerChannel * channels * 8
         }
     }
 }
